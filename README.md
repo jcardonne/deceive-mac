@@ -77,6 +77,10 @@ The Riot Client is started with `--client-config-url` pointing at a local proxy 
 the publicly trusted certificate for `deceive-localhost.molenzwiebel.xyz` (no keychain change)
 and rewrites `<presence>` stanzas on their way out.
 
+## Star history
+
+[![Star history](https://api.star-history.com/svg?repos=jcardonne/deceive-mac&type=Date)](https://www.star-history.com/#jcardonne/deceive-mac&Date)
+
 ## Credits
 
 macOS port of [Deceive](https://github.com/molenzwiebel/Deceive) by Thijs Molendijk, under the
