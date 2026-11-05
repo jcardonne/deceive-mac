@@ -48,7 +48,15 @@ if [ "${MAKE_DMG:-1}" = "1" ]; then
   rm -rf dist/dmg && mkdir -p dist/dmg
   cp -R "$APP" dist/dmg/
   ln -s /Applications dist/dmg/Applications
-  hdiutil create -volname "Deceive" -srcfolder dist/dmg -ov -format UDZO \
-    "dist/Deceive-$VERSION-$LABEL.dmg" >/dev/null
+  # hdiutil intermittently fails with "Resource busy" on CI runners
+  for attempt in 1 2 3; do
+    rm -f "dist/Deceive-$VERSION-$LABEL.dmg"
+    if hdiutil create -volname "Deceive" -srcfolder dist/dmg -ov -format UDZO \
+         "dist/Deceive-$VERSION-$LABEL.dmg" >/dev/null 2>&1; then
+      break
+    fi
+    [ "$attempt" = 3 ] && { echo "hdiutil failed 3 times" >&2; exit 1; }
+    sleep 5
+  done
   echo "built dist/Deceive-$VERSION-$LABEL.dmg"
 fi
