@@ -1,0 +1,62 @@
+name: build
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14      # Apple Silicon
+            arch: arm64
+          - runner: macos-13      # last Intel image
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt -r requirements-dev.txt
+      - name: Build app and DMG
+        env:
+          VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '1.0.0' }}
+        run: |
+          export VERSION="${VERSION#v}"
+          ARCH=${{ matrix.arch }} ./scripts/build_app.sh
+      - name: Run the bundled self-test
+        run: dist/Deceive.app/Contents/MacOS/Deceive --selftest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dmg-${{ matrix.arch }}
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  release:
+    needs: macos
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Deceive ${TAG#v}" \
+              --notes "Download the DMG that matches your Mac: arm64 for Apple Silicon, x86_64 for Intel. First launch: right-click the app and choose Open."
+          gh release upload "$TAG" artifacts/*.dmg --clobber --repo "$GITHUB_REPOSITORY"

@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+build/
+dist/
+assets/AppIcon.icns
+assets/AppIcon.iconset/
+.DS_Store
