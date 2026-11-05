@@ -901,16 +901,13 @@ class Session:
         self.deceive = Deceive(status)
         self.config_url = ""
         self.control_port = 0
-        self.cert_expiry = 0.0
         self._listener: socket.socket | None = None
         self._config: ConfigProxy | None = None
         self._control: http.server.ThreadingHTTPServer | None = None
-        self._process: subprocess.Popen | None = None
 
     # -- lifecycle
-    def start(self) -> tuple[str, int]:
+    def start(self) -> None:
         tls, expiry = load_certificate()
-        self.cert_expiry = expiry
         log(f"proxy certificate valid until {time.strftime('%Y-%m-%d', time.localtime(expiry))}")
 
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -932,7 +929,6 @@ class Session:
         self._control = control
         self.control_port = control.server_address[1]
         log(f"control endpoint http://127.0.0.1:{self.control_port}/")
-        return self.config_url, self.control_port
 
     def stop(self) -> None:
         for server in (self._config, self._control):
@@ -959,10 +955,8 @@ class Session:
                           "--launch-patchline=live", "--allow-direct-launch"]
         log(f"launching {binary.name} ({game}, status {self.deceive.status})")
         try:
-            self._process = subprocess.Popen(
-                [str(binary), *arguments],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
+            subprocess.Popen([str(binary), *arguments],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except OSError as exc:
             log(f"cannot start the Riot Client: {exc}")
             return False
