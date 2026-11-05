@@ -947,7 +947,11 @@ class Session:
 
     # -- Riot Client
     def launch(self, game: str = "rc") -> bool:
-        binary = riot_client_path()
+        try:
+            binary = riot_client_path()
+        except SystemExit as exc:  # Riot Client not installed
+            log(str(exc))
+            return False
         product = PRODUCTS[game]
         arguments = [f"--client-config-url={self.config_url}"]
         if product:
