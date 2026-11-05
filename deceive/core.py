@@ -690,7 +690,9 @@ class ChatConnection:
                 self.to_client(fake_player_presence())
             self.owner.send_to_client(fake_player_message(
                 f"Deceive is active, you are appearing {self.owner.status}. "
-                "Send online / offline / mobile / enable / disable / status here."
+                "Send online / offline / mobile / enable / disable / status here. "
+                "Enjoying it? Please star the project: "
+                "https://github.com/jcardonne/deceive-mac"
             ))
             return
         self.to_client(stanza)
