@@ -6,6 +6,10 @@ cd "$(dirname "$0")/.."
 
 VERSION="${VERSION:-1.0.0}"
 ARCH="${ARCH:-$(uname -m)}"
+case "$ARCH" in
+  x86_64|i386) LABEL="x64" ;;
+  *) LABEL="$ARCH" ;;
+esac
 BUNDLE_ID="com.deceivemac.deceive"
 APP="dist/Deceive.app"
 
@@ -45,6 +49,6 @@ if [ "${MAKE_DMG:-1}" = "1" ]; then
   cp -R "$APP" dist/dmg/
   ln -s /Applications dist/dmg/Applications
   hdiutil create -volname "Deceive" -srcfolder dist/dmg -ov -format UDZO \
-    "dist/Deceive-$VERSION-$ARCH.dmg" >/dev/null
-  echo "built dist/Deceive-$VERSION-$ARCH.dmg"
+    "dist/Deceive-$VERSION-$LABEL.dmg" >/dev/null
+  echo "built dist/Deceive-$VERSION-$LABEL.dmg"
 fi

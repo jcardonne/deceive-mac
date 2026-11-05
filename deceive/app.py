@@ -67,6 +67,8 @@ class DeceiveApp(NSObject):
         self.status = saved_status()
         self._items: dict[str, NSMenuItem] = {}
         self._quit = False
+        self._restarting = False
+        self._grace_until = 0.0
         return self
 
     # ---------------------------------------------------------------- startup
@@ -120,9 +122,11 @@ class DeceiveApp(NSObject):
             return
         self.game = game
         remember("game", game)
+        self._grace_until = time.time() + 30
         if not self.session.launch(game):
             alert("Deceive could not launch the game",
                   f"The Riot Client binary could not be started.\n\nLog: {LOG_PATH}")
+        self._restarting = False
 
     def _kill_client(self, wait: bool) -> None:
         if self.session is not None:
@@ -249,6 +253,7 @@ class DeceiveApp(NSObject):
         threading.Thread(target=self._restart_thread, daemon=True).start()
 
     def _restart_thread(self) -> None:
+        self._restarting = True
         self._kill_client(wait=True)
         AppHelper.callAfter(self._launch_game, self.game)
 
@@ -276,6 +281,8 @@ class DeceiveApp(NSObject):
         self._refresh_menu()
         if self.session is None:
             return
+        if self._restarting or time.time() < self._grace_until:
+            return  # the client is being killed or has just been started
         if self.session.client_running():
             return
         self._refresh_menu()
