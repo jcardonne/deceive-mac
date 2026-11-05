@@ -139,12 +139,6 @@ class DeceiveApp(NSObject):
                     return
                 time.sleep(0.25)
 
-    def _restart_game(self) -> None:
-        self._kill_client(wait=True)
-        if self.session is None and not self._start_session():
-            return
-        self._launch_game(self.game)
-
     # ------------------------------------------------------------------- menu
     def _build_menu(self) -> None:
         bar = NSStatusBar.systemStatusBar()

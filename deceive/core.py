@@ -25,7 +25,6 @@ import http.client
 import http.server
 import json
 import re
-import signal
 import socket
 import ssl
 import subprocess
@@ -454,7 +453,7 @@ for prefix, uri in (("", "jabber:client"),):
 GAME_PRESENCES = ("bacon", "lion", "keystone", "riot_client", "teamfighttactics", "valorant")
 
 
-def rewrite_presence(raw: bytes, status: str, connect_muc: bool) -> bytes | None:
+def rewrite_presence(raw: bytes, status: str) -> bytes | None:
     """Mask a <presence> stanza. Returns None to drop it, else the stanza to send."""
     try:
         root = ET.fromstring(raw)
@@ -466,9 +465,7 @@ def rewrite_presence(raw: bytes, status: str, connect_muc: bool) -> bytes | None
         return raw
 
     if root.get("to") is not None:
-        # presence addressed to a lobby/MUC: leave it alone so lobby chat and
-        # invites keep working, or drop it entirely when MUC is disabled
-        return raw if connect_muc else None
+        return raw  # lobby presence: leave it online so chat and invites keep working
 
     games = find_child(root, "games")
     league = find_child(games, "league_of_legends")
@@ -662,7 +659,7 @@ class ChatConnection:
         if b"<presence" in stanza and owner.enabled:
             if local_name(_peek_tag(stanza)) == "presence" and not DIRECTED_PRESENCE.match(stanza):
                 self.last_presence = stanza
-            rewritten = rewrite_presence(stanza, owner.status, owner.connect_muc)
+            rewritten = rewrite_presence(stanza, owner.status)
             if rewritten is None:
                 debug("dropped presence (lobby chat disabled)")
                 return
@@ -702,7 +699,7 @@ class ChatConnection:
     def resend_presence(self) -> None:
         if self.last_presence is None:
             return
-        rewritten = rewrite_presence(self.last_presence, self.owner.status, self.owner.connect_muc)
+        rewritten = rewrite_presence(self.last_presence, self.owner.status)
         if rewritten is not None:
             self.to_server(rewritten)
 
@@ -727,10 +724,9 @@ def _extract_body(stanza: bytes) -> str:
 
 
 class Deceive:
-    def __init__(self, status: str = "offline", connect_muc: bool = True) -> None:
+    def __init__(self, status: str = "offline") -> None:
         self.status = status
         self.enabled = True
-        self.connect_muc = connect_muc
         self.state_lock = threading.Lock()
         self.connections: list[ChatConnection] = []
         self.chat_endpoint: tuple[str, int] | None = None
@@ -896,16 +892,13 @@ def riot_client_running() -> bool:
 class Session:
     """One Deceive run: client-config proxy, chat relay, control endpoint."""
 
-    def __init__(self, status: str = "offline", connect_muc: bool = True,
-                 chat_host: str | None = None, chat_port: int | None = None,
-                 debug: bool = False) -> None:
+    def __init__(self, status: str = "offline", debug: bool = False) -> None:
         global DEBUG, _log_file
         DEBUG = debug
         LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         if _log_file is None:
             _log_file = open(LOG_PATH, "a", buffering=1)  # noqa: SIM115
-        self.deceive = Deceive(status, connect_muc)
-        self.requested = (chat_host, chat_port)
+        self.deceive = Deceive(status)
         self.config_url = ""
         self.control_port = 0
         self.cert_expiry = 0.0
@@ -931,9 +924,6 @@ class Session:
         self._config = config
         self.config_url = f"http://127.0.0.1:{config.server_address[1]}"
 
-        host, port = self.requested
-        if host and port:
-            self.deceive.chat_endpoint = (host, port)
         threading.Thread(target=self.deceive.serve_chat, args=(listener, tls),
                          daemon=True).start()
 
@@ -960,18 +950,13 @@ class Session:
             self._listener = None
 
     # -- Riot Client
-    def launch(self, game: str = "rc", patchline: str = "live",
-               client_params: str | None = None, game_params: str | None = None) -> bool:
+    def launch(self, game: str = "rc") -> bool:
         binary = riot_client_path()
-        product = PRODUCTS["rc"] if game == "auto" else PRODUCTS[game]
+        product = PRODUCTS[game]
         arguments = [f"--client-config-url={self.config_url}"]
         if product:
-            arguments += [f"--launch-product={product}", f"--launch-patchline={patchline}",
-                          "--allow-direct-launch"]
-        if client_params:
-            arguments.append(client_params)
-        if game_params:
-            arguments += ["--", game_params]
+            arguments += [f"--launch-product={product}",
+                          "--launch-patchline=live", "--allow-direct-launch"]
         log(f"launching {binary.name} ({game}, status {self.deceive.status})")
         try:
             self._process = subprocess.Popen(
@@ -1012,58 +997,34 @@ class Session:
 def main() -> int:
     parser = argparse.ArgumentParser(prog="deceive",
                                     description="Appear offline in Riot games on macOS.")
-    parser.add_argument("game", nargs="?", default="auto", choices=[*PRODUCTS, "auto"],
-                        help="which game to launch (auto = the Riot Client only)")
+    parser.add_argument("game", nargs="?", default="rc", choices=list(PRODUCTS),
+                        help="which game to launch (default: the Riot Client only)")
     parser.add_argument("--status", default=None, choices=["chat", "offline", "mobile"],
                         help="presence to mask with (default: last used, else offline)")
-    parser.add_argument("--patchline", default="live")
-    parser.add_argument("--riot-client-params", default=None)
-    parser.add_argument("--game-params", default=None)
-    parser.add_argument("--no-muc", action="store_true", help="do not forward lobby chat presence")
-    parser.add_argument("--no-launch", action="store_true",
-                        help="only run the proxies; print the client-config URL")
-    parser.add_argument("--chat-host", default=None, help="override the real chat host (testing)")
-    parser.add_argument("--chat-port", type=int, default=None,
-                        help="override the real chat port (testing)")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--allow-running", action="store_true",
-                        help="do not refuse to start when the Riot Client is already open")
     args = parser.parse_args()
 
     if args.selftest:
         return selftest()
 
-    if args.status is None:
-        args.status = saved_status()
-
-    session = Session(args.status, not args.no_muc, args.chat_host, args.chat_port, args.debug)
+    session = Session(args.status or saved_status(), debug=args.debug)
     session.start()
     log(f"deceive starting, log at {LOG_PATH}")
 
     if not _domain_resolves():
         log(f"WARNING: {LOCALHOST_DOMAIN} does not resolve to 127.0.0.1 on this network")
 
-    if args.chat_host and args.chat_port:
-        log(f"fixed chat target {args.chat_host}:{args.chat_port}, not launching the client")
-        _wait_forever()
-        return 0
-
-    if args.no_launch:
-        log(f"client-config URL: {session.config_url}")
-        log('launch the Riot Client with: '
-            f'--client-config-url="{session.config_url}"')
-        _wait_forever()
-        return 0
-
-    if riot_client_running() and not args.allow_running:
-        log("Riot Client already running; close it first (or pass --allow-running)")
+    if riot_client_running():
+        log("Riot Client already running; close it first")
+        session.stop()
         return 2
 
-    if not session.launch(args.game, args.patchline, args.riot_client_params, args.game_params):
+    if not session.launch(args.game):
+        session.stop()
         return 3
     if not session.wait_for_client():
-        _wait_forever()
+        session.stop()
         return 4
     try:
         session.wait_for_exit()
@@ -1087,13 +1048,6 @@ def _domain_resolves() -> bool:
         return False
 
 
-def _wait_forever() -> None:
-    stop = threading.Event()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        signal.signal(sig, lambda *_: stop.set())
-    stop.wait()
-
-
 # ------------------------------------------------------------------- selftest
 
 
@@ -1112,7 +1066,7 @@ def selftest() -> int:
         b"<bacon><st>chat</st></bacon></games><platform>riot</platform></presence>"
     )
 
-    offline = rewrite_presence(presence, "offline", True)
+    offline = rewrite_presence(presence, "offline")
     check("offline rewrites show", b"<show>offline</show>" in offline, offline)
     check("offline drops status", b"<status>" not in offline)
     check("offline drops league", b"league_of_legends" not in offline)
@@ -1120,20 +1074,17 @@ def selftest() -> int:
     check("offline drops keystone", b"<keystone" not in offline)
     check("offline keeps presence", offline.startswith(b"<presence"))
 
-    in_game = rewrite_presence(presence, "chat", True)
+    in_game = rewrite_presence(presence, "chat")
     check("chat keeps dnd presence untouched", in_game == presence)
 
-    mobile = rewrite_presence(presence, "mobile", True)
+    mobile = rewrite_presence(presence, "mobile")
     check("mobile keeps league", b"league_of_legends" in mobile, mobile)
     check("mobile drops payload p", b"<p>eyJ</p>" not in mobile, mobile)
     check("mobile drops payload m", b"<m>2</m>" not in mobile, mobile)
     check("mobile sets show", b"<show>mobile</show>" in mobile)
 
-    muc = rewrite_presence(b"<presence to='lobby@conference.x'><show>chat</show></presence>",
-                           "offline", False)
-    check("no_muc drops directed presence", muc is None)
     lobby = b"<presence to='lobby@conference.x'><show>chat</show></presence>"
-    check("muc presence stays untouched", rewrite_presence(lobby, "offline", True) == lobby)
+    check("lobby presence stays untouched", rewrite_presence(lobby, "offline") == lobby)
 
     splitter = StanzaSplitter()
     header = b"<stream:stream xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>"
