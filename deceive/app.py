@@ -26,6 +26,7 @@ from .core import (
     CACHE_DIR,
     LOG_PATH,
     PRODUCTS,
+    STAR_LINE,
     Session,
     riot_client_running,
     saved_status,
@@ -281,7 +282,8 @@ class DeceiveApp(NSObject):
             return
         self._refresh_menu()
         alert("Riot Client closed",
-              "The Riot Client has exited, so Deceive stopped masking your status.")
+              "The Riot Client has exited, so Deceive stopped masking your status. "
+              f"Click OK to quit Deceive.\n\n{STAR_LINE}")
         if self.session is not None:
             self.session.stop()
         NSApp.terminate_(None)

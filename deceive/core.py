@@ -43,6 +43,7 @@ CONFIG_HOST = "clientconfig.rpg.riotgames.com"
 GEO_PAS_URL = "https://riot-geo.pas.si.riotgames.com/pas/v1/service/chat"
 CERT_URL = "https://mln.cx/deceive/localhost.pfx"
 USER_AGENT = "Deceive v1.18.0"
+STAR_LINE = "Enjoying it? Please star the project: https://github.com/jcardonne/deceive-mac"
 ROSTER_MARKER = b"<query xmlns='jabber:iq:riotgames:roster'>"
 DIRECTED_PRESENCE = re.compile(rb"^<presence\b[^>]*?\bto\s*=")
 
@@ -690,9 +691,7 @@ class ChatConnection:
                 self.to_client(fake_player_presence())
             self.owner.send_to_client(fake_player_message(
                 f"Deceive is active, you are appearing {self.owner.status}. "
-                "Send online / offline / mobile / enable / disable / status here. "
-                "Enjoying it? Please star the project: "
-                "https://github.com/jcardonne/deceive-mac"
+                f"Send online / offline / mobile / enable / disable / status here. {STAR_LINE}"
             ))
             return
         self.to_client(stanza)
