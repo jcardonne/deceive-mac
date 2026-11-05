@@ -2,6 +2,10 @@
 
 # Deceive for macOS
 
+[![build](https://github.com/jcardonne/deceive-mac/actions/workflows/build.yml/badge.svg)](https://github.com/jcardonne/deceive-mac/actions/workflows/build.yml)
+[![release](https://img.shields.io/github/v/release/jcardonne/deceive-mac?label=download)](https://github.com/jcardonne/deceive-mac/releases/latest)
+[![license: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+
 Appear offline in **League of Legends**, **Teamfight Tactics** and **Legends of Runeterra**
 on macOS, without losing anything you actually use: you can still talk in lobbies and
 champion select, invite friends and queue up.
@@ -11,7 +15,8 @@ Menu bar app, no terminal, no configuration files.
 
 ## Install
 
-1. Open [Releases](../../releases) and download the DMG for your Mac:
+1. Open the [latest release](https://github.com/jcardonne/deceive-mac/releases/latest)
+   and download the DMG for your Mac:
    - `Deceive-1.0.0-arm64.dmg` for Apple Silicon (M1 and later)
    - `Deceive-1.0.0-x64.dmg` for Intel Macs
 2. Open the DMG and drag **Deceive** into **Applications**.
