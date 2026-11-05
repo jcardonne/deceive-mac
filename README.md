@@ -43,6 +43,8 @@ accepts `offline`, `mobile`, `online`, `enable`, `disable` and `status` in game 
   Verify with a second account, or `grep "relaying chat" ~/Library/Logs/deceive-mac.log`.
 - **"App is damaged" or nothing happens.** Right-click → **Open**, or run
   `xattr -dr com.apple.quarantine /Applications/Deceive.app`.
+- **No icon in the menu bar.** The status area is full (common on notched MacBooks) and
+  macOS hides new items: hide another one and Deceive's eye appears.
 - **A domain does not resolve.** `deceive-localhost.molenzwiebel.xyz` must resolve to
   `127.0.0.1`: use 1.1.1.1 as DNS, or add that name with `127.0.0.1` to `/etc/hosts`.
 - **Can I get banned?** Riot [confirmed](https://i.thijsmolendijk.nl/deceive_ok.png) Deceive
