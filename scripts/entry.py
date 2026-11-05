@@ -8,7 +8,10 @@ if "--selftest" in sys.argv:
     sys.exit(selftest())
 
 if "--version" in sys.argv:
-    print("Deceive 1.0.0")
+    from Foundation import NSBundle
+
+    version = NSBundle.mainBundle().objectForInfoDictionaryKey_("CFBundleShortVersionString")
+    print("Deceive", version or "unknown")
     sys.exit(0)
 
 if "-h" in sys.argv or "--help" in sys.argv:
